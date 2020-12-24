@@ -1,0 +1,11 @@
+*Cache
+*.log
+.mp4
+.mp3
+.opus
+.webm
+
+.vscode/
+Downloads/
+ffmpeg-prebuilt/
+Deprecated/
