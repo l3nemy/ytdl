@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"mime"
 	"net/url"
 	"os"
 	"regexp"
@@ -16,8 +15,8 @@ import (
 	e "github.com/sam1677/ytdl/internal/ytdlerrors"
 )
 
-//DecipherFormat deciphers given Format
-func (vi *VideoInfo) DecipherFormat(f *Format) error {
+//decipherFormat deciphers given Format
+func (vi *VideoInfo) decipherFormat(f *Format) error {
 	_, data, err := u.DownloadFile(vi.Microformat.PlayerMicroformatRenderer.Embed.IframeURL, "", "", true)
 	if err != nil {
 		return e.DbgErr(err)
@@ -28,7 +27,7 @@ func (vi *VideoInfo) DecipherFormat(f *Format) error {
 		return e.DbgErr(err)
 	}
 
-	err = ioutil.WriteFile(tmpScriptDir+"outerHtml.html", data, 0755)
+	err = ioutil.WriteFile(u.MergePathAndFilename(tmpScriptDir, "outerHtml.html"), data, 0755)
 	if err != nil {
 		return e.DbgErr(err)
 	}
@@ -45,10 +44,11 @@ func (vi *VideoInfo) DecipherFormat(f *Format) error {
 	//scriptSrc := r1.FindStringSubmatch(scriptStr)[1]
 	//scriptURL := "https://www.youtube.com" + scriptSrc
 
-	r := regexp.MustCompile(`"(\/[^"<>]*\/base.js)"`)
+	scriptSrc, err := regexpSearch(`"(\/[^"<>]*\/base.js)"`, string(data), 1)
+	if err != nil {
+		return err
+	}
 
-	//TODO: Change it to RegexpSearch function
-	scriptSrc := string(r.FindSubmatch(data)[1])
 	scriptURL := "https://www.youtube.com" + scriptSrc
 
 	_, data, err = u.DownloadFile(scriptURL, "", "", true)
@@ -56,7 +56,7 @@ func (vi *VideoInfo) DecipherFormat(f *Format) error {
 		return e.DbgErr(err)
 	}
 
-	err = ioutil.WriteFile(tmpScriptDir+"script.js", data, 0755)
+	err = ioutil.WriteFile(u.MergePathAndFilename(tmpScriptDir, "script.js"), data, 0755)
 	if err != nil {
 		return e.DbgErr(err)
 	}
@@ -86,42 +86,46 @@ func (vi *VideoInfo) DecipherFormat(f *Format) error {
 	if err != nil {
 		return e.DbgErr(err)
 	}
+	f.SignatureCipher = ""
 
 	val.Add(sigKey, sig)
 	URL.RawQuery = val.Encode()
 
 	f.URL = URL.String()
-	f.SignatureCipher = ""
 
 	return nil
 }
 
-//DecipherAll executes DecipherFormat for all Format in the VideoInfo
-func (vi *VideoInfo) DecipherAll() error {
+//decipherAll executes DecipherFormat for all Format in the VideoInfo
+func (vi *VideoInfo) decipherAll() error {
 	var err error
 	for _, sd := range [][]*Format{vi.StreamingData.Formats, vi.StreamingData.AdaptiveFormats} {
 		for _, f := range sd {
 			if f.URL == "" || f.SignatureCipher != "" {
-				err = vi.DecipherFormat(f)
+				err = vi.decipherFormat(f)
 				if err != nil {
 					return e.DbgErr(err)
 				}
 			}
 
 			//Additional Commands
-			typ, _, err := mime.ParseMediaType(f.MimeType)
-			if err != nil {
-				return e.DbgErr(err)
-			}
-			typLst := strings.Split(typ, "/")
-			f.Type = typLst[0]
-			fileType := typLst[len(typLst)-1]
-			if f.Type == "audio" {
-				fileType = "mp3"
-				if strings.Contains(f.MimeType, "opus") {
-					fileType = "opus"
-				}
-			}
+			//typ, _, err := mime.ParseMediaType(f.MimeType)
+			//if err != nil {
+			//	return e.DbgErr(err)
+			//}
+
+			f.ItagProp = itagList[f.Itag]
+			fileType := f.ItagProp.FileType
+			f.Type = f.ItagProp.ContentType.String()
+
+			//typLst := strings.Split(typ, "/")
+			//fileType := typLst[len(typLst)-1]
+			//if f.Type == "audio" {
+			//	fileType = "mp3"
+			//	if strings.Contains(f.MimeType, "opus") {
+			//		fileType = "opus"
+			//	}
+			//}
 			f.Parent = vi
 			format := "%s-%s-%s.%s"
 			if f.QualityLabel == "" {
@@ -401,18 +405,11 @@ func (c *decipherer) regexpSearch(exp, str string, group int) (string, error) {
 
 func (c *decipherer) regexpSearchAll(exp, str string) ([]string, error) {
 	c.logf("Regexp Search Start : \n\t\texp : %s\n", exp)
-	r, err := regexp.Compile(exp)
+	ret, err := regexpSearchAll(exp, str)
 	if err != nil {
 		return nil, e.DbgErr(err)
 	}
-
-	results := r.FindStringSubmatch(str)
-	if results == nil || len(results) == 0 {
-		//fmt.Println("\"", exp, "\"", "\n", str)
-		return nil, e.DbgErr(e.ErrRegexpNotMatched)
-	}
-
-	return results, nil
+	return ret, nil
 }
 
 func reverse(args ...interface{}) []string {

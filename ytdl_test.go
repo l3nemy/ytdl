@@ -11,13 +11,13 @@ var vi *ytdl.VideoInfo
 var err error
 
 func TestGetVideoInfo(t *testing.T) {
-	vi, err = ytdl.GetVideoInfo("9bZkp7q19f0")
+	vi, err = ytdl.GetVideoInfo("https://www.youtube.com/watch?v=BL70VjXfFCk")
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
-	t.Log(vi.StreamingData.AdaptiveFormats[0].URL)
+	t.Logf("%+v\n", vi.CombinedFormatList().Sort())
 }
 
 func TestDownload(t *testing.T) {

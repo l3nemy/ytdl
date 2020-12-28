@@ -1,7 +1,6 @@
 package ytdl
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/sam1677/ytdl/internal/ffmpeg"
@@ -12,11 +11,11 @@ import (
 const getVideoInfoURL = "https://www.youtube.com/get_video_info?video_id=%s"
 
 const (
-	tmpJSONDir          = "./jsonCache/"
-	tmpAudioDir         = "./audioCache/"
+	tmpJSONDir          = "./jsonCache"
+	tmpAudioDir         = "./audioCache"
 	tmpVideoDir         = "./videoCache"
-	tmpScriptDir        = "./scriptCache/"
-	downloadDefaultPath = "./Downloads/"
+	tmpScriptDir        = "./scriptCache"
+	downloadDefaultPath = "./Downloads"
 )
 
 //DownloadOptions contains Download Path, Filename
@@ -49,7 +48,6 @@ func (f *Format) Download(options *DownloadOptions) error {
 	}
 	defer file.Close()
 
-	fmt.Println(*options)
 	if options.AudioOverride != nil {
 		err = f.audioOverride(options.AudioOverride, file, options.Path)
 		if err != nil {
