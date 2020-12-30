@@ -2,15 +2,122 @@ package ytdl
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"reflect"
 	"regexp"
+	"sort"
 
 	u "github.com/sam1677/ytdl/internal/utils"
 	e "github.com/sam1677/ytdl/internal/ytdlerrors"
 )
+
+//FormatList describes FormatPtr slice
+type FormatList []*Format
+
+// Audios gets audio list from given FormatList
+func (fl FormatList) Audios() FormatList {
+	return fl.contentType(Audio)
+}
+
+// Videos gets video list from given FormatList
+func (fl FormatList) Videos() FormatList {
+	return fl.contentType(Video | VandA)
+}
+
+func (fl FormatList) contentType(ct ContentType) FormatList {
+	ret := FormatList{}
+	for _, f := range fl {
+		switch {
+		case ct&Audio != 0:
+			if f.ItagProp.ContentType == Audio {
+				ret = append(ret, f)
+			}
+		case ct&Video != 0:
+			if f.ItagProp.ContentType == Video {
+				ret = append(ret, f)
+			}
+		case ct&VandA != 0:
+			if f.ItagProp.ContentType == VandA {
+				ret = append(ret, f)
+			}
+		}
+	}
+	return ret
+}
+
+// First gets first element from given FormatList
+func (fl FormatList) First() *Format {
+	if len(fl) == 0 {
+		return nil
+	}
+	return fl[0]
+}
+
+// Last gets last element from given FormatList
+func (fl FormatList) Last() *Format {
+	if len(fl) == 0 {
+		return nil
+	}
+	return fl[len(fl)-1]
+}
+
+// Worst gets worst quality element from given FormatList
+func (fl FormatList) Worst() *Format {
+	fl.SortByFieldName("Bitrate")
+	return fl.First()
+}
+
+// Best gets best quality element from given FormatList
+func (fl FormatList) Best() *Format {
+	fl.SortByFieldName("Bitrate")
+	return fl.Last()
+}
+
+// Reverse gets reversed FormatList of given FormatList
+func (fl FormatList) Reverse() FormatList {
+	temp := FormatList{}
+	size := len(temp) - 1
+	for i, f := range fl {
+		temp[size-i] = f
+	}
+	return temp
+}
+
+// Sort sorts FormatList By Itag
+func (fl FormatList) Sort() FormatList {
+	return fl.SortByFieldName("Itag")
+}
+
+// SortByFieldName sorts FormatList by given field's value
+func (fl FormatList) SortByFieldName(fieldName string) FormatList {
+	sort.Slice(fl, func(i, j int) bool {
+		ir := checkNGetElem(reflect.ValueOf(fl[i])).FieldByName(fieldName)
+		jr := checkNGetElem(reflect.ValueOf(fl[j])).FieldByName(fieldName)
+
+		switch ir.Interface().(type) {
+		case int:
+			return ir.Int() < jr.Int()
+		case uint:
+			return ir.Uint() < jr.Uint()
+		case string:
+			return ir.String() < jr.String()
+		default:
+			panic(errors.New("Field Type is not compareable"))
+		}
+	})
+	return fl
+}
+
+func checkNGetElem(v reflect.Value) reflect.Value {
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	return v
+}
 
 //VideoInfo Descibes Video's Informations (get_video_info?video_id=(videoID))
 type VideoInfo struct {
@@ -20,9 +127,9 @@ type VideoInfo struct {
 	} `json:"playabilityStatus"`
 
 	StreamingData struct {
-		ExpiresInSeconds string    `json:"expiresInSeconds"`
-		Formats          []*Format `json:"formats"`
-		AdaptiveFormats  []*Format `json:"adaptiveFormats"`
+		ExpiresInSeconds string     `json:"expiresInSeconds"`
+		Formats          FormatList `json:"formats"`
+		AdaptiveFormats  FormatList `json:"adaptiveFormats"`
 	} `json:"streamingData"`
 
 	VideoDetails struct {
@@ -94,6 +201,51 @@ type Format struct {
 	Filename string     `json:"-"`
 	Parent   *VideoInfo `json:"-"`
 	Type     string     `json:"-"`
+	ItagProp ItagProp   `json:"-"`
+}
+
+func (f *Format) String() string {
+	fLength := "ContentLength: %s (ApproxDurations: %s ms)\n"
+	if f.ApproxDurationsMs == "" {
+		fLength = "ContentLength: %s%s\n"
+	}
+
+	switch f.ItagProp.ContentType {
+	case Video, VandA:
+		return fmt.Sprintf(
+			"\nItag : %d\n"+
+				"Mime: %s\n"+
+				"Quality: %s (Label: %s, FPS: %d)\n"+
+				"Bitrate: %d (Average: %d)\n"+
+				"Size: (%d x %d)\n"+
+				fLength+
+				"ExpectedDefaultFilename: %s\n",
+			f.Itag,
+			f.MimeType,
+			f.Quality, f.QualityLabel, f.FPS,
+			f.Bitrate, f.AverageBitrate,
+			f.Width, f.Height,
+			f.ContentLength, f.ApproxDurationsMs,
+			f.Filename,
+		)
+	case Audio:
+		return fmt.Sprintf(
+			"\nItag : %d\n"+
+				"Mime: %s\n"+
+				"Quality: %s\n"+
+				"Bitrate: %d (Average: %d)\n"+
+				fLength+
+				"ExpectedDefaultFilename: %s\n",
+			f.Itag,
+			f.MimeType,
+			f.Quality,
+			f.Bitrate, f.AverageBitrate,
+			f.ContentLength, f.ApproxDurationsMs,
+			f.Filename,
+		)
+	}
+
+	return ""
 }
 
 //FormatAudio is optional field in Format
@@ -118,7 +270,13 @@ type Thumbnail struct {
 }
 
 //GetVideoInfo Gets get_video_info file From Youtube
-func GetVideoInfo(VID string) (*VideoInfo, error) {
+func GetVideoInfo(VIDorURL string) (*VideoInfo, error) {
+
+	VID, err := getVideoIDFromURL(VIDorURL)
+	if err != nil {
+		return nil, err
+	}
+
 	URL := fmt.Sprintf(getVideoInfoURL, VID)
 
 	res, err := http.Get(URL)
@@ -136,6 +294,7 @@ func GetVideoInfo(VID string) (*VideoInfo, error) {
 	if err != nil {
 		return nil, e.DbgErr(err)
 	}
+
 	r := regexp.MustCompile(`player_response=({.*})`)
 	matches := r.FindStringSubmatch(temp)
 
@@ -146,7 +305,7 @@ func GetVideoInfo(VID string) (*VideoInfo, error) {
 		return nil, e.DbgErr(err)
 	}
 
-	err = ioutil.WriteFile(fmt.Sprintf("%s%s.json", tmpJSONDir, VID), rawJSON, 0755)
+	err = ioutil.WriteFile(fmt.Sprintf("%s.json", u.MergePathAndFilename(tmpJSONDir, VID)), rawJSON, 0755)
 	if err != nil {
 		return nil, e.DbgErr(err)
 	}
@@ -158,10 +317,61 @@ func GetVideoInfo(VID string) (*VideoInfo, error) {
 		return nil, e.DbgErr(err)
 	}
 
-	err = vi.DecipherAll()
+	err = vi.decipherAll()
 	if err != nil {
 		return nil, e.DbgErr(err)
 	}
 
 	return vi, nil
+}
+
+// CombinedFormatList returns FormatList combined Formats and AdaptiveFormats
+func (vi *VideoInfo) CombinedFormatList() FormatList {
+	fl := *new(FormatList)
+	fl = append(fl, vi.StreamingData.Formats...)
+	fl = append(fl, vi.StreamingData.AdaptiveFormats...)
+	return fl
+}
+
+func getVideoIDFromURL(URL string) (string, error) {
+	rs := []string{
+		`https?:\/\/www\.youtube\.com\/watch\?v=(\w+)`,
+		`https?:\/\/youtu\.be\/(\w+)`,
+		`(\w+)`,
+	}
+	for _, r := range rs {
+		ret, err := regexpSearch(r, URL, 1)
+		if err != nil {
+			if e.IsRegexpErr(err) {
+				continue
+			}
+			return "", e.DbgErr(err)
+		}
+		return ret, nil
+	}
+	return URL, e.DbgErr(e.ErrRegexpNotMatched)
+}
+
+func regexpSearch(exp, str string, ind int) (string, error) {
+	ret, err := regexpSearchAll(exp, str)
+	if err != nil {
+		return "", e.DbgErr(err)
+	}
+
+	return ret[ind], nil
+}
+
+func regexpSearchAll(exp, str string) ([]string, error) {
+	r, err := regexp.Compile(exp)
+	if err != nil {
+		return nil, e.DbgErr(err)
+	}
+
+	results := r.FindStringSubmatch(str)
+	if results == nil || len(results) == 0 {
+		//fmt.Println("\"", exp, "\"", "\n", str)
+		return nil, e.DbgErr(e.ErrRegexpNotMatched)
+	}
+
+	return results, nil
 }

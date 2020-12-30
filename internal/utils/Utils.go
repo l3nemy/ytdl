@@ -1,4 +1,4 @@
-package ytdl
+package utils
 
 import (
 	"fmt"
