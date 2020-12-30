@@ -11,30 +11,27 @@ var vi *ytdl.VideoInfo
 var err error
 
 func TestGetVideoInfo(t *testing.T) {
-	vi, err = ytdl.GetVideoInfo("https://www.youtube.com/watch?v=BL70VjXfFCk")
+	vi, err = ytdl.GetVideoInfo("https://www.youtube.com/watch?v=9bZkp7q19f0")
 	if err != nil {
 		t.Error(err)
 		return
 	}
-
 	t.Logf("%+v\n", vi.CombinedFormatList().Sort())
 }
 
 func TestDownload(t *testing.T) {
 	fmt.Println("getting videoInfo")
-	if !t.Run("TestGetVideoInfo", TestGetVideoInfo) {
-		panic(err)
-	}
-	fmt.Println("getting videoInfo done")
-
-	audios := []*ytdl.Format{}
-	for _, format := range vi.StreamingData.AdaptiveFormats {
-		if format.Type == "audio" {
-			audios = append(audios, format)
+	if vi == nil {
+		if !t.Run("TestGetVideoInfo", TestGetVideoInfo) {
+			panic(err)
 		}
 	}
 
-	err = vi.StreamingData.AdaptiveFormats[0].Download(&ytdl.DownloadOptions{AudioOverride: audios[0]})
+	fmt.Println("getting videoInfo done")
+
+	audios := vi.StreamingData.AdaptiveFormats.Audios()
+
+	err = vi.StreamingData.AdaptiveFormats.Videos().Best().Download(&ytdl.DownloadOptions{AudioOverride: audios.Best()})
 	if err != nil {
 		t.Error(err)
 		return

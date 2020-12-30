@@ -16,6 +16,8 @@ import (
 
 var baseDir string
 
+var dbgMode bool = false
+
 //FFMpeg Contains FFMpeg's Executable Path and If it uses Preinstalled Executable
 type FFMpeg struct {
 	Executable            string
@@ -90,7 +92,7 @@ func (f *FFMpeg) MergeVideoNAudio(video *os.File, audio *os.File, path, outputFi
 //It is different from *os.Command
 func (f *FFMpeg) Exec(args ...string) (cmd *exec.Cmd, stdout <-chan []byte, stderr <-chan []byte, err error) {
 	cmd = exec.Command("/bin/bash", "-c", strings.Join(args, " "))
-	fmt.Println(cmd)
+	dbgPrintln(cmd)
 
 	sout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -192,7 +194,7 @@ func defaultStdoutHandler(sout []byte) error {
 	if out == "" {
 		return nil
 	}
-	fmt.Println(out)
+	dbgPrintln(out)
 	return nil
 }
 
@@ -201,7 +203,7 @@ func defaultStderrHandler(serr []byte) error {
 	if err == "" {
 		return nil
 	}
-	fmt.Println(err)
+	dbgPrintln(err)
 	return nil
 }
 
@@ -212,4 +214,10 @@ func defaultDeferFunc(state *os.ProcessState, lastError string) error {
 		return e.DbgErr(errors.New(lastError))
 	}
 	return nil
+}
+
+func dbgPrintln(args ...interface{}) {
+	if dbgMode {
+		fmt.Println(args...)
+	}
 }

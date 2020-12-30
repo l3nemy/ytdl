@@ -5,8 +5,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"reflect"
-	"sort"
 
 	e "github.com/sam1677/ytdl/internal/ytdlerrors"
 )
@@ -89,76 +87,3 @@ func MergePathAndFilename(path, filename string) string {
 	}
 	return filename
 }
-
-func SortByMapStringKey(mapp interface{}, descending bool) (sortedMap map[string]interface{}) {
-	sortedMap = map[string]interface{}{}
-	rh := newReflectHelper(mapp)
-
-	sortedKeys := sort.StringSlice{}
-	keys := []string{}
-	for _, k := range rh.val.MapKeys() {
-		sortedKeys = append(sortedKeys, k.Interface().(string))
-		keys = append(keys, k.Interface().(string))
-	}
-
-	sort.Strings(sortedKeys)
-	if descending {
-		i := sort.Reverse(sort.StringSlice(sortedKeys))
-		sortedKeys = i.(sort.StringSlice)
-	}
-
-	vals := MapValues(rh.val)
-
-	for _, sk := range sortedKeys {
-		i := 0
-		for ind, k := range keys {
-			if sk == k {
-				i = ind
-				break
-			}
-		}
-		sortedMap[sk] = vals[i]
-	}
-	return sortedMap
-}
-
-func SortByMapIntKey(mapp interface{}, descending bool) (sortedMap map[int]interface{}) {
-	// mapp map[int]interface{}
-	sortedMap = map[int]interface{}{}
-	rh := newReflectHelper(mapp)
-
-	if err := rh.assertKinds([]reflect.Kind{
-		reflect.Map,
-	}); err != nil {
-		panic(err)
-	}
-
-	sortedKeys := sort.IntSlice{}
-	keys := []int{}
-	for _, k := range rh.val.MapKeys() {
-		sortedKeys = append(sortedKeys, k.Interface().(int))
-		keys = append(keys, k.Interface().(int))
-	}
-
-	sortedKeys.Sort()
-	if descending {
-		i := sort.Reverse(sort.IntSlice(sortedKeys))
-		sortedKeys = i.(sort.IntSlice)
-	}
-
-	vals := MapValues(rh.val)
-
-	for _, sk := range sortedKeys {
-		i := 0
-		for ind, k := range keys {
-			if sk == k {
-				i = ind
-				break
-			}
-		}
-		sortedMap[sk] = vals[i]
-	}
-	return sortedMap
-}
-
-// TODO: func SortByStructField

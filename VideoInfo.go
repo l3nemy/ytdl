@@ -2,35 +2,121 @@ package ytdl
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"reflect"
 	"regexp"
+	"sort"
 
 	u "github.com/sam1677/ytdl/internal/utils"
 	e "github.com/sam1677/ytdl/internal/ytdlerrors"
 )
 
+//FormatList describes FormatPtr slice
 type FormatList []*Format
 
-func (fl FormatList) Sort() FormatList {
-	mapp := fl.ToItagMap()
-	sm := u.SortByMapIntKey(mapp, false)
+// Audios gets audio list from given FormatList
+func (fl FormatList) Audios() FormatList {
+	return fl.contentType(Audio)
+}
 
-	m := map[int]*Format{}
-	for key, val := range sm {
-		m[key] = val.(*Format)
-	}
+// Videos gets video list from given FormatList
+func (fl FormatList) Videos() FormatList {
+	return fl.contentType(Video | VandA)
+}
 
+func (fl FormatList) contentType(ct ContentType) FormatList {
 	ret := FormatList{}
-
-	for _, v := range u.MapValues(reflect.ValueOf(m)) {
-		ret = append(ret, v.(*Format))
+	for _, f := range fl {
+		switch {
+		case ct&Audio != 0:
+			if f.ItagProp.ContentType == Audio {
+				ret = append(ret, f)
+			}
+		case ct&Video != 0:
+			if f.ItagProp.ContentType == Video {
+				ret = append(ret, f)
+			}
+		case ct&VandA != 0:
+			if f.ItagProp.ContentType == VandA {
+				ret = append(ret, f)
+			}
+		}
 	}
-
 	return ret
+}
+
+// First gets first element from given FormatList
+func (fl FormatList) First() *Format {
+	if len(fl) == 0 {
+		return nil
+	}
+	return fl[0]
+}
+
+// Last gets last element from given FormatList
+func (fl FormatList) Last() *Format {
+	if len(fl) == 0 {
+		return nil
+	}
+	return fl[len(fl)-1]
+}
+
+// Worst gets worst quality element from given FormatList
+func (fl FormatList) Worst() *Format {
+	fl.SortByFieldName("Bitrate")
+	return fl.First()
+}
+
+// Best gets best quality element from given FormatList
+func (fl FormatList) Best() *Format {
+	fl.SortByFieldName("Bitrate")
+	return fl.Last()
+}
+
+// Reverse gets reversed FormatList of given FormatList
+func (fl FormatList) Reverse() FormatList {
+	temp := FormatList{}
+	size := len(temp) - 1
+	for i, f := range fl {
+		temp[size-i] = f
+	}
+	return temp
+}
+
+// Sort sorts FormatList By Itag
+func (fl FormatList) Sort() FormatList {
+	return fl.SortByFieldName("Itag")
+}
+
+// SortByFieldName sorts FormatList by given field's value
+func (fl FormatList) SortByFieldName(fieldName string) FormatList {
+	sort.Slice(fl, func(i, j int) bool {
+		ir := checkNGetElem(reflect.ValueOf(fl[i])).FieldByName(fieldName)
+		jr := checkNGetElem(reflect.ValueOf(fl[j])).FieldByName(fieldName)
+
+		switch ir.Interface().(type) {
+		case int:
+			return ir.Int() < jr.Int()
+		case uint:
+			return ir.Uint() < jr.Uint()
+		case string:
+			return ir.String() < jr.String()
+		default:
+			panic(errors.New("Field Type is not compareable"))
+		}
+	})
+	return fl
+}
+
+func checkNGetElem(v reflect.Value) reflect.Value {
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	return v
 }
 
 //VideoInfo Descibes Video's Informations (get_video_info?video_id=(videoID))
@@ -239,6 +325,7 @@ func GetVideoInfo(VIDorURL string) (*VideoInfo, error) {
 	return vi, nil
 }
 
+// CombinedFormatList returns FormatList combined Formats and AdaptiveFormats
 func (vi *VideoInfo) CombinedFormatList() FormatList {
 	fl := *new(FormatList)
 	fl = append(fl, vi.StreamingData.Formats...)

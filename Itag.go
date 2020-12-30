@@ -5,11 +5,11 @@ type ContentType int
 
 const (
 	//Audio only Audio
-	Audio ContentType = iota
+	Audio ContentType = 1 // 001
 	//Video only Video
-	Video
+	Video = 2 //010
 	//VandA Video includes Audio
-	VandA
+	VandA = 4 //100
 )
 
 func (t ContentType) String() string {
