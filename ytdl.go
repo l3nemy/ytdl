@@ -27,7 +27,7 @@ type DownloadOptions struct {
 }
 
 //Download Downloads format and overrides audio if AudioOverride is not nil
-func (f *Format) Download(options *DownloadOptions) error {
+func (f *Format) Download(options *DownloadOptions) (*os.File, error) {
 	if options == nil {
 		options = new(DownloadOptions)
 	}
@@ -44,17 +44,17 @@ func (f *Format) Download(options *DownloadOptions) error {
 
 	file, err := f.downloadWithPath(path, options.Filename)
 	if err != nil {
-		return e.DbgErr(err)
+		return nil, e.DbgErr(err)
 	}
 	defer file.Close()
 
 	if options.AudioOverride != nil {
-		err = f.audioOverride(options.AudioOverride, file, options.Path)
+		file, err = f.audioOverride(options.AudioOverride, file, options.Path)
 		if err != nil {
-			return e.DbgErr(err)
+			return nil, e.DbgErr(err)
 		}
 	}
-	return nil
+	return file, nil
 }
 
 func (f *Format) downloadWithPath(path string, filename string) (*os.File, error) {
@@ -69,29 +69,29 @@ func (f *Format) downloadWithPath(path string, filename string) (*os.File, error
 	return file, nil
 }
 
-func (f *Format) audioOverride(audio *Format, videoFile *os.File, finalDir string) error {
+func (f *Format) audioOverride(audio *Format, videoFile *os.File, finalDir string) (*os.File, error) {
 	audioFile, err := audio.downloadWithPath(tmpAudioDir, audio.Filename)
 	if err != nil {
-		return e.DbgErr(err)
+		return nil, e.DbgErr(err)
 	}
 
 	ff := new(ffmpeg.FFMpeg)
 
 	err = ff.Init()
 	if err != nil {
-		return e.DbgErr(err)
+		return nil, e.DbgErr(err)
 	}
 
 	vinfo, err := videoFile.Stat()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	err = ff.MergeVideoNAudio(videoFile, audioFile, finalDir, vinfo.Name())
+	file, err := ff.MergeVideoNAudio(videoFile, audioFile, finalDir, vinfo.Name())
 	if err != nil {
-		return e.DbgErr(err)
+		return nil, e.DbgErr(err)
 	}
 
 	audioFile.Close()
-	return nil
+	return file, nil
 }

@@ -68,13 +68,12 @@ func (fl FormatList) Last() *Format {
 // Worst gets worst quality element from given FormatList
 func (fl FormatList) Worst() *Format {
 	fl.SortByFieldName("Bitrate")
-	return fl.First()
+	return fl.SortByQuality().First()
 }
 
 // Best gets best quality element from given FormatList
 func (fl FormatList) Best() *Format {
-	fl.SortByFieldName("Bitrate")
-	return fl.Last()
+	return fl.SortByQuality().Last()
 }
 
 // Reverse gets reversed FormatList of given FormatList
@@ -90,6 +89,11 @@ func (fl FormatList) Reverse() FormatList {
 // Sort sorts FormatList By Itag
 func (fl FormatList) Sort() FormatList {
 	return fl.SortByFieldName("Itag")
+}
+
+// SortByQuality sorts FormatList By Bitrate
+func (fl FormatList) SortByQuality() FormatList {
+	return fl.SortByFieldName("Bitrate")
 }
 
 // SortByFieldName sorts FormatList by given field's value

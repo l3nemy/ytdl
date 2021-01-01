@@ -31,7 +31,7 @@ func TestDownload(t *testing.T) {
 
 	audios := vi.StreamingData.AdaptiveFormats.Audios()
 
-	err = vi.StreamingData.AdaptiveFormats.Videos().Best().Download(&ytdl.DownloadOptions{AudioOverride: audios.Best()})
+	_, err = vi.StreamingData.AdaptiveFormats.Videos().Best().Download(&ytdl.DownloadOptions{AudioOverride: audios.Best()})
 	if err != nil {
 		t.Error(err)
 		return

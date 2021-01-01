@@ -66,13 +66,13 @@ func (f *FFMpeg) Init() error {
 }
 
 //MergeVideoNAudio Merges a Video and a Audio into one Video
-func (f *FFMpeg) MergeVideoNAudio(video *os.File, audio *os.File, path, outputFileName string) error {
+func (f *FFMpeg) MergeVideoNAudio(video *os.File, audio *os.File, path, outputFileName string) (*os.File, error) {
 	fmt.Println("Start merging video and audio")
 	defer fmt.Println("End merging video and audio")
 
 	err := u.CreatePath(path)
 	if err != nil {
-		return e.DbgErr(err)
+		return nil, e.DbgErr(err)
 	}
 
 	_, err = f.ExecWithDefaultHandle(
@@ -80,12 +80,16 @@ func (f *FFMpeg) MergeVideoNAudio(video *os.File, audio *os.File, path, outputFi
 		fmt.Sprintf("%s -i %s -i %s -c:v copy -c:a copy -map 0:v -map 1:a -nostdin -y %s",
 			f.Executable, video.Name(), audio.Name(), u.MergePathAndFilename(path, outputFileName),
 		))
-
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	file, err := os.OpenFile(outputFileName, os.O_RDWR, 0755)
+	if err != nil {
+		return nil, err
+	}
+
+	return file, nil
 }
 
 //Exec executes command
