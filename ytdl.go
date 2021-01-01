@@ -70,7 +70,6 @@ func (f *Format) Download(options *DownloadOptions) (*os.File, error) {
 	if err != nil {
 		return nil, e.DbgErr(err)
 	}
-	defer file.Close()
 
 	if options.AudioOverride != nil {
 		file, err = f.audioOverride(options.AudioOverride, file, options.Path)
