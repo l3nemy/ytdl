@@ -9,7 +9,7 @@ import (
 	e "github.com/sam1677/ytdl/internal/ytdlerrors"
 )
 
-//DownloadFile Downloads file from given URL to path
+//DownloadFile creates path and downloads file from given URL to path
 //
 //if onlyData is true
 //file won't saved and just return data of it
@@ -21,38 +21,51 @@ func DownloadFile(URL string, path string, filename string, onlyData bool) (file
 
 	res, err := http.Get(URL)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, e.DbgErr(err)
+	}
+
+	if res.StatusCode != http.StatusOK {
+		return nil, nil, fmt.Errorf("code=%d, message=%s", res.StatusCode, res.Status)
 	}
 
 	data, err = ioutil.ReadAll(res.Body)
 	if err != nil {
 		return nil, nil, e.DbgErr(err)
 	}
-
 	defer res.Body.Close()
 
 	if onlyData {
 		return nil, data, nil
 	}
 
+	file, err = WriteFile(data, path, filename)
+	if err != nil {
+		return nil, nil, e.DbgErr(err)
+	}
+
+	return file, data, nil
+}
+
+//WriteFile creates file and write data into it
+func WriteFile(data []byte, path, filename string) (writtenFile *os.File, err error) {
 	err = CreatePath(path)
 	if err != nil {
-		return nil, nil, err
+		return nil, e.DbgErr(err)
 	}
 
 	filename = MergePathAndFilename(path, filename)
 
-	file, err = os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0755)
+	writtenFile, err = os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0755)
 	if err != nil {
-		return nil, nil, err
+		return nil, e.DbgErr(err)
 	}
 
-	_, err = file.Write(data)
+	_, err = writtenFile.Write(data)
 	if err != nil {
-		return nil, nil, err
+		return nil, e.DbgErr(err)
 	}
 
-	return file, data, nil
+	return writtenFile, nil
 }
 
 //CreatePath Check if folder exists and if does not it creates folder

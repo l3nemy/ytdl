@@ -32,18 +32,6 @@ func (vi *VideoInfo) decipherFormat(f *Format) error {
 		return e.DbgErr(err)
 	}
 
-	//r := regexp.MustCompile(`<\s*script[^<>]*name\s*=\s*"player_ias/base"[^<>]*>[^<>]*<\s*/script\s*>`)
-	//r1 := regexp.MustCompile(`src="([^" ]*\.js)"`)
-
-	//matched := r.FindStringSubmatch(string(data))
-	//if len(matched) == 0 {
-	//	return errors.New("An Error Occured on Loading Script")
-	//}
-
-	//scriptStr := matched[0]
-	//scriptSrc := r1.FindStringSubmatch(scriptStr)[1]
-	//scriptURL := "https://www.youtube.com" + scriptSrc
-
 	scriptSrc, err := regexpSearch(`"(\/[^"<>]*\/base.js)"`, string(data), 1)
 	if err != nil {
 		return err
@@ -342,7 +330,7 @@ func (c *decipherer) getTransformMap(firstFuncName string) (ret map[string]inter
 		t := strings.SplitN(obj, ":", 2)
 		c.log(t)
 		if len(t) < 2 {
-			return nil, errors.New("Function count is less than 2")
+			return nil, e.DbgErr(errors.New("Function count is less than 2"))
 		}
 
 		funcName := t[0]

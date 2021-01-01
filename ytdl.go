@@ -15,8 +15,32 @@ const (
 	tmpAudioDir         = "./audioCache"
 	tmpVideoDir         = "./videoCache"
 	tmpScriptDir        = "./scriptCache"
+	tmpVideoInfoDir     = "./VideoInfoCache"
 	downloadDefaultPath = "./Downloads"
 )
+
+var (
+	//JSONCaching enables caching Json response body
+	JSONCaching = false
+	//AudioCaching enables caching Audio before merging into one file
+	AudioCaching = false
+	//VideoCaching enables caching Video before merging into one file
+	VideoCaching = false
+	//ScriptCaching enables caching base.js embed.html
+	ScriptCaching = false
+	//VideoInfoCaching enables caching get_video_info response body
+	VideoInfoCaching = false
+)
+
+//DebugMode turns on all of caching mode
+func DebugMode() {
+	JSONCaching = true
+	AudioCaching = true
+	VideoCaching = true
+	ScriptCaching = true
+	VideoInfoCaching = true
+	e.DbgMode = true
+}
 
 //DownloadOptions contains Download Path, Filename
 //and AudioFormat
@@ -74,6 +98,10 @@ func (f *Format) audioOverride(audio *Format, videoFile *os.File, finalDir strin
 	if err != nil {
 		return nil, e.DbgErr(err)
 	}
+	defer func() {
+		videoFile.Close()
+		audioFile.Close()
+	}()
 
 	ff := new(ffmpeg.FFMpeg)
 
@@ -84,7 +112,7 @@ func (f *Format) audioOverride(audio *Format, videoFile *os.File, finalDir strin
 
 	vinfo, err := videoFile.Stat()
 	if err != nil {
-		return nil, err
+		return nil, e.DbgErr(err)
 	}
 
 	file, err := ff.MergeVideoNAudio(videoFile, audioFile, finalDir, vinfo.Name())
@@ -92,6 +120,18 @@ func (f *Format) audioOverride(audio *Format, videoFile *os.File, finalDir strin
 		return nil, e.DbgErr(err)
 	}
 
-	audioFile.Close()
+	if !AudioCaching {
+		err := os.Remove(audioFile.Name())
+		if err != nil {
+			return nil, e.DbgErr(err)
+		}
+	}
+
+	if !VideoCaching {
+		err := os.Remove(videoFile.Name())
+		if err != nil {
+			return nil, e.DbgErr(err)
+		}
+	}
 	return file, nil
 }

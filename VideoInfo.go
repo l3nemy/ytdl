@@ -2,10 +2,7 @@ package ytdl
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"net/url"
 	"reflect"
 	"regexp"
@@ -110,7 +107,7 @@ func (fl FormatList) SortByFieldName(fieldName string) FormatList {
 		case string:
 			return ir.String() < jr.String()
 		default:
-			panic(errors.New("Field Type is not compareable"))
+			panic(e.DbgErr(e.ErrFieldType))
 		}
 	})
 	return fl
@@ -278,40 +275,32 @@ func GetVideoInfo(VIDorURL string) (*VideoInfo, error) {
 
 	VID, err := getVideoIDFromURL(VIDorURL)
 	if err != nil {
-		return nil, err
+		return nil, e.DbgErr(err)
 	}
 
 	URL := fmt.Sprintf(getVideoInfoURL, VID)
 
-	res, err := http.Get(URL)
+	_, data, err := u.DownloadFile(URL, tmpVideoInfoDir, VID, !VideoInfoCaching)
 	if err != nil {
 		return nil, e.DbgErr(err)
 	}
 
-	data, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return nil, e.DbgErr(err)
-	}
-	defer res.Body.Close()
-
-	temp, err := url.QueryUnescape(string(data))
+	val, err := url.ParseQuery(string(data))
 	if err != nil {
 		return nil, e.DbgErr(err)
 	}
 
-	r := regexp.MustCompile(`player_response=({.*})`)
-	matches := r.FindStringSubmatch(temp)
-
-	rawJSON := []byte(matches[1])
-
-	err = u.CreatePath(tmpJSONDir)
-	if err != nil {
-		return nil, e.DbgErr(err)
+	if val.Get("status") == "fail" {
+		return nil, e.DbgErr(e.ErrVIDIsInvalid)
 	}
 
-	err = ioutil.WriteFile(fmt.Sprintf("%s.json", u.MergePathAndFilename(tmpJSONDir, VID)), rawJSON, 0755)
-	if err != nil {
-		return nil, e.DbgErr(err)
+	rawJSON := []byte(val.Get("player_response"))
+
+	if JSONCaching {
+		_, err = u.WriteFile(rawJSON, tmpJSONDir, VID+".json")
+		if err != nil {
+			return nil, e.DbgErr(err)
+		}
 	}
 
 	vi := new(VideoInfo)

@@ -11,7 +11,8 @@ var vi *ytdl.VideoInfo
 var err error
 
 func TestGetVideoInfo(t *testing.T) {
-	vi, err = ytdl.GetVideoInfo("https://www.youtube.com/watch?v=9bZkp7q19f0")
+	ytdl.DebugMode()
+	vi, err = ytdl.GetVideoInfo("https://www.youtube.com/watch?v=9bZkp70")
 	if err != nil {
 		t.Error(err)
 		return

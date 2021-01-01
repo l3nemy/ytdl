@@ -19,8 +19,12 @@ type CipherErr moduleErr
 type RegexpErr moduleErr
 
 var (
+	//ErrVIDIsInvalid VideoID is invalid
+	ErrVIDIsInvalid YtdlErr = errors.New("VideoID is invalid")
 	//ErrURLIsEmpty URL is Empty
 	ErrURLIsEmpty YtdlErr = errors.New("URL is empty. (Check if Format's URL is Ciphered)")
+	//ErrFieldType Given field type is not compareable
+	ErrFieldType YtdlErr = errors.New("Field Type is not compareable")
 	//ErrJSstrIsEmpty JSstr is empty
 	ErrJSstrIsEmpty CipherErr = errors.New("Js string is empty")
 	//ErrRegexpNotMatched RegexpNotMatched
