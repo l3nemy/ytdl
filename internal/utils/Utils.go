@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -13,26 +14,22 @@ import (
 //
 //if onlyData is true
 //file won't saved and just return data of it
-func DownloadFile(URL string, path string, filename string, onlyData bool) (file *os.File, data []byte, err error) {
+func DownloadFile(URL, path, filename string, onlyData bool) (file *os.File, data []byte, err error) {
 	if !onlyData {
 		fmt.Println(filename, "Start downloading from :", URL)
 		defer fmt.Println(filename, "End downloading from :", URL)
 	}
 
-	res, err := http.Get(URL)
+	r, err := StreamFile(URL)
 	if err != nil {
 		return nil, nil, e.DbgErr(err)
 	}
 
-	if res.StatusCode != http.StatusOK {
-		return nil, nil, fmt.Errorf("code=%d, message=%s", res.StatusCode, res.Status)
-	}
-
-	data, err = ioutil.ReadAll(res.Body)
+	data, err = ioutil.ReadAll(r)
 	if err != nil {
 		return nil, nil, e.DbgErr(err)
 	}
-	defer res.Body.Close()
+	defer r.Close()
 
 	if onlyData {
 		return nil, data, nil
@@ -42,8 +39,20 @@ func DownloadFile(URL string, path string, filename string, onlyData bool) (file
 	if err != nil {
 		return nil, nil, e.DbgErr(err)
 	}
-
 	return file, data, nil
+}
+
+//StreamFile gets response's body
+func StreamFile(URL string) (io.ReadCloser, error) {
+	res, err := http.Get(URL)
+	if err != nil {
+		return nil, e.DbgErr(err)
+	}
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("code=%d, message=%s", res.StatusCode, res.Status)
+	}
+	return res.Body, nil
 }
 
 //WriteFile creates file and write data into it
@@ -64,7 +73,6 @@ func WriteFile(data []byte, path, filename string) (writtenFile *os.File, err er
 	if err != nil {
 		return nil, e.DbgErr(err)
 	}
-
 	return writtenFile, nil
 }
 

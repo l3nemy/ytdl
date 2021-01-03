@@ -1,6 +1,7 @@
 package ytdl
 
 import (
+	"io"
 	"os"
 
 	"github.com/sam1677/ytdl/internal/ffmpeg"
@@ -78,6 +79,39 @@ func (f *Format) Download(options *DownloadOptions) (*os.File, error) {
 		}
 	}
 	return file, nil
+}
+
+//StreamOptions Contains AudioOverride
+type StreamOptions struct {
+	AudioOverride *Format
+}
+
+//Stream streams format and overrides audio if AudioOverride is not nil
+func (f *Format) Stream(options *StreamOptions) (io.ReadCloser, error) {
+	if options == nil {
+		options = &StreamOptions{}
+	}
+
+	ff := ffmpeg.FFMpeg{}
+	err := ff.Init()
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := u.StreamFile(f.URL)
+	if err != nil {
+		return nil, err
+	}
+
+	if options.AudioOverride != nil {
+		audioFile, _, err := u.DownloadFile(options.AudioOverride.URL, tmpAudioDir, options.AudioOverride.Filename, false)
+		if err != nil {
+			return nil, err
+		}
+
+		return ff.MergeVideoNAudioStream(r, audioFile)
+	}
+	return r, nil
 }
 
 func (f *Format) downloadWithPath(path string, filename string) (*os.File, error) {

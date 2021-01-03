@@ -312,7 +312,6 @@ func (c *decipherer) getTransformObject(firstFuncName string) ([]string, error) 
 		}
 		ret = append(ret, r)
 	}
-
 	return ret, nil
 }
 
@@ -387,7 +386,6 @@ func (c *decipherer) regexpSearch(exp, str string, group int) (string, error) {
 	if err != nil {
 		return "", e.DbgErr(err)
 	}
-
 	return results[group], nil
 }
 

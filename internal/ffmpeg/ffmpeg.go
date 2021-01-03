@@ -61,7 +61,6 @@ func (f *FFMpeg) Init() error {
 		}
 		f.Executable += "/ffmpeg"
 	}
-
 	return nil
 }
 
@@ -88,13 +87,49 @@ func (f *FFMpeg) MergeVideoNAudio(video *os.File, audio *os.File, path, outputFi
 	if err != nil {
 		return nil, err
 	}
-
 	return file, nil
 }
 
-//Exec executes command
+//MergeVideoNAudioStream merges video and audio and returns Reader of result
+func (f *FFMpeg) MergeVideoNAudioStream(video io.Reader, audio *os.File) (io.ReadCloser, error) {
+	fmt.Println("Start merging video and audio")
+	defer fmt.Println("End merging video and audio")
+
+	cmd := exec.Command("/bin/bash", "-c", fmt.Sprintf("%s -i pipe: -i %s -c:v copy -c:a copy -map 0:v -map 1:a -y pipe:",
+		f.Executable, audio.Name(),
+	))
+
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, err
+	}
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, err
+	}
+
+	for {
+		buf := bufio.NewReader(video)
+		data, err := buf.ReadByte()
+		if err != nil {
+			if err == io.EOF || err == io.ErrUnexpectedEOF {
+				break
+			}
+			return nil, err
+		}
+
+		_, err = stdin.Write([]byte{data})
+		if err != nil {
+			return nil, err
+		}
+	}
+	return stdout, nil
+}
+
+//ExecChan executes command
 //It is different from *os.Command
-func (f *FFMpeg) Exec(args ...string) (cmd *exec.Cmd, stdout <-chan []byte, stderr <-chan []byte, err error) {
+func (f *FFMpeg) ExecChan(args ...string) (cmd *exec.Cmd, stdout <-chan []byte, stderr <-chan []byte, err error) {
 	cmd = exec.Command("/bin/bash", "-c", strings.Join(args, " "))
 	dbgPrintln(cmd)
 
@@ -112,7 +147,6 @@ func (f *FFMpeg) Exec(args ...string) (cmd *exec.Cmd, stdout <-chan []byte, stde
 	if err != nil {
 		return nil, nil, nil, e.DbgErr(err)
 	}
-
 	return cmd, NewChanFromReader(sout), NewChanFromReader(serr), nil
 }
 
@@ -122,7 +156,7 @@ func (f *FFMpeg) ExecWithHandle(
 	stderrHandler func([]byte) error,
 	deferFunc func(*os.ProcessState, string) error, args ...string) (*exec.Cmd, error) {
 
-	cmd, stdout, stderr, err := f.Exec(args...)
+	cmd, stdout, stderr, err := f.ExecChan(args...)
 	if err != nil {
 		return nil, e.DbgErr(err)
 	}
